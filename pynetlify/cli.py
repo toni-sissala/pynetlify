@@ -13,8 +13,12 @@ def deploy_folder(netlify_api, args):
 
 
 def create_site(netlify_api, args):
-    site = netlify_api.create_site(name=args.name,
-                                   custom_domain=args.domain)
+    site_properties = {}
+    if args.name:
+        site_properties.update({'name': args.name})
+    if args.domain:
+        site_properties.update({'custom_domain': args.domain})
+    site = netlify_api.create_site(site_properties)
     print(site)
 
 
