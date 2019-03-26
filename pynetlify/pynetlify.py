@@ -128,6 +128,9 @@ class APIRequest:
                     filepath.replace(folder, '', 1):
                     hashlib.sha1(filehandle.read()).hexdigest()
                 })
+        if files_hashes == {}:
+            logger.warning('Found no files from path %s', (lookup_path))
+            return None
         logger.debug('Requesting required hashes of files %s',
                      ', '.join(files_hashes.keys()))
         response = requests.post(self._auth_url(
