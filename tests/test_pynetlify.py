@@ -1,8 +1,14 @@
+import sys
 import unittest
-from unittest import mock
 from tempfile import NamedTemporaryFile
-
 from pynetlify import pynetlify
+
+
+running_python2 = sys.version_info[0] == 2
+if running_python2:
+    import mock
+else:
+    from unittest import mock
 
 
 class APIRequestTestBase(unittest.TestCase):
@@ -41,9 +47,14 @@ class TestAPIRequestsCRD(APIRequestTestBase):
             self._netlify_api_url + 'sites?access_token={}'.format('auth-token'),
             headers=self._api.headers)
         self.assertEqual(len(sites), 2)
-        self.assertCountEqual(sites, [
-            pynetlify.rdict_to_site(self._test_sites[0]),
-            pynetlify.rdict_to_site(self._test_sites[1])])
+        if running_python2:
+            self.assertItemsEqual(sites, [
+                pynetlify.rdict_to_site(self._test_sites[0]),
+                pynetlify.rdict_to_site(self._test_sites[1])])
+        else:
+            self.assertCountEqual(sites, [
+                pynetlify.rdict_to_site(self._test_sites[0]),
+                pynetlify.rdict_to_site(self._test_sites[1])])
         mock_response.json.assert_called_with()
 
     def test_create_site(self):
