@@ -94,7 +94,7 @@ class TestAPIRequestsDeploy(APIRequestTestBase):
     @mock.patch.object(pynetlify, 'glob')
     def test_deploy_folder_to_site_posts_filepath(self, mock_glob):
         tempfile = NamedTemporaryFile()
-        stripped_name = tempfile.name.replace('/tmp', '', 1)
+        stripped_name = tempfile.name.replace('/tmp/', '', 1)
         mock_glob.iglob.return_value = [tempfile.name]
         self._api.deploy_folder_to_site('/tmp', mock.Mock(id='some_other_id'))
         self.assertEqual(self._mock_requests.post.call_count, 1)
