@@ -101,6 +101,32 @@ class TestAPIRequestsDeploy(APIRequestTestBase):
         _, kwargs = self._mock_requests.post.call_args
         self.assertEqual(list(kwargs['json']['files'].keys())[0], stripped_name)
 
+    @mock.patch.object(pynetlify, 'hashlib')
+    @mock.patch.object(pynetlify, 'glob')
+    def test_deploy_folder_to_site_puts_filecontents(self,
+                                                     mock_glob,
+                                                     mock_hashlib):
+        mock_hash = mock.Mock()
+        mock_hash.hexdigest.return_value = 'some_hash'
+        mock_hashlib.sha1.return_value = mock_hash
+        mock_response = mock.Mock()
+        mock_response.json.return_value = {'id': 'dep_id',
+                                           'required': ['some_hash']}
+        tempfile = NamedTemporaryFile()
+        expected_url = self._netlify_api_url +\
+            'deploys/dep_id/files/{}?access_token={}'\
+            .format(tempfile.name.replace('/tmp/', '', 1),
+                    'auth-token')
+        mock_glob.iglob.return_value = [tempfile.name]
+        self._mock_requests.post.return_value = mock_response
+        rval = self._api.deploy_folder_to_site('/tmp', mock.Mock(id='some_other_id'))
+        self.assertEqual(self._mock_requests.put.call_count, 1)
+        args, _ = self._mock_requests.put.call_args
+        url = args[0]
+        print(url)
+        self.assertEqual(url, expected_url)
+        self.assertEqual(rval, 'dep_id')
+
 
 if __name__ == '__main__':
     unittest.main()

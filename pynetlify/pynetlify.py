@@ -117,6 +117,7 @@ class APIRequest:
         :returns: None if nothing gets deployed. Deploy id if files get deployed.
         :rtype: None or int
         """
+        folder = folder + os.sep if not folder.endswith(os.sep) else folder
         lookup_path = os.path.join(folder, '**')
         files_hashes = {}
         for filepath in glob.iglob(lookup_path, recursive=True):
