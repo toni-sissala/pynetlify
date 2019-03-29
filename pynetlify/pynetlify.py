@@ -15,13 +15,19 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+import sys
 from collections import namedtuple
-import urllib
 import hashlib
 import glob
 import logging
 import pprint
 import requests
+
+
+if sys.version_info[0] == 2:
+    from urllib import quote as quote_url
+else:
+    from urllib.parse import quote as quote_url
 
 
 Site = namedtuple('Site', ['name', 'id', 'url'])
@@ -157,7 +163,7 @@ class APIRequest:
                 response = requests.put(
                     self._auth_url('v1', 'deploys',
                                    deploy_id, 'files',
-                                   urllib.parse.quote(hashes_files[required_hash])),
+                                   quote_url(hashes_files[required_hash])),
                     data=filehandle,
                     headers=deploy_headers)
                 response.raise_for_status()
