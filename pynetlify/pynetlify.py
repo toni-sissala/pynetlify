@@ -50,6 +50,7 @@ def rdict_to_site(rdict):
 class APIRequest:
 
     base_url = 'https://api.netlify.com/api/'
+    api_version = 'v1'
     headers = {'User-Agent': 'PyNetlify (toni.sissala@gmail.com)'}
 
     def __init__(self, auth_token):
@@ -61,16 +62,50 @@ class APIRequest:
         self._auth_token = auth_token
 
     def _auth_url(self, *p):
-        url = self.base_url + '/'.join(p) + '?access_token={}'.format(self._auth_token)
+        if self.api_version is not None:
+            api_url = self.base_url + self.api_version + '/'
+        else:
+            api_url = self.base_url
+        url = api_url + '/'.join(p) + '?access_token={}'.format(self._auth_token)
         return url
+
+    def get_site(self, site_id_or_domain):
+        """Get site information.
+
+        :param site_id_or_domain: Site id or domain
+        :type site_id_or_domain: stream
+        :returns: Site.
+        :rtype: :obj:`Site`
+        """
+        url = self._auth_url('sites', site_id_or_domain)
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        response_json = response.json()
+        logger.debug(pprint.pformat(response_json))
+        return rdict_to_site(response_json)
+
+    def get_site_files(self, site):
+        """Get files in site.
+
+        :param site: Target site.
+        :type site: :obj:`Site`
+        :returns: List of files.
+        :rtype: list
+        """
+        url = self._auth_url('sites', site.id, 'files')
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        response_json = response.json()
+        logger.debug(pprint.pformat(response_json))
+        return response_json
 
     def sites(self):
         """Iterate sites.
 
-        :returns: Generator which iterates sites.
-        :rtype: :obj:`Generator`
+        :returns: Sites one by one.
+        :rtype: :obj:`Site`
         """
-        url = self._auth_url('v1', 'sites')
+        url = self._auth_url('sites')
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
         for site in response.json():
@@ -85,7 +120,7 @@ class APIRequest:
         :returns: Created site.
         :rtype: :obj:`Site`
         """
-        response = requests.post(self._auth_url('v1', 'sites'), json=site_properties, headers=self.headers)
+        response = requests.post(self._auth_url('sites'), json=site_properties, headers=self.headers)
         response.raise_for_status()
         if response.status_code != 201:
             logger.warning('Unexpected response status code %s'
@@ -100,26 +135,21 @@ class APIRequest:
         :returns: True if success.
         :rtype: bool
         """
-        url = self._auth_url('v1', 'sites', site.id)
+        url = self._auth_url('sites', site.id)
         response = requests.delete(url, headers=self.headers)
         response.raise_for_status()
-        if response.status_code != 200:
+        if response.status_code != 204:
             logger.warning('Unexpected response status code %s'
                            % (response.status_code,))
         return True
 
-    def deploy_folder_to_site(self, folder, site, force_all=False):
+    def deploy_folder_to_site(self, folder, site):
         """Deploy a folder to a site.
 
         :param folder: Path to a folder.
         :type folder: str
         :param site: Site to deploy to.
         :type site: :obj:`Site`
-        :param force_all: Force all flag will deploy all
-                          files found from ''folder'' regardless
-                          if they are already deployed to the site.
-                          Defaults to False.
-        :type force_all: bool
         :returns: None if nothing gets deployed. Deploy id if files get deployed.
         :rtype: None or int
         """
@@ -136,35 +166,50 @@ class APIRequest:
                     hashlib.sha1(filehandle.read()).hexdigest()
                 })
         if files_hashes == {}:
+            # TODO Should we POST anyway to delete all previously deployed files?
             logger.warning('Found no files from path %s', (lookup_path))
             return None
         logger.debug('Requesting required hashes of files %s',
                      ', '.join(files_hashes.keys()))
-        response = requests.post(self._auth_url(
-            'v1', 'sites', site.id, 'deploys'),
+        response = requests.post(self._auth_url('sites',
+                                                site.id,
+                                                'deploys'),
                                  json={'files': files_hashes},
                                  headers=self.headers)
         response.raise_for_status()
         response_json = response.json()
         logger.debug(pprint.pformat(response_json))
+        deploy_id = response_json['id']
         required_hashes = response_json['required']
         logger.debug('Required filehashes: %s', required_hashes)
-        if not required_hashes and not force_all:
-            return None
+        if not required_hashes:
+            return deploy_id
         hashes_files = {value: key for (key, value) in files_hashes.items()}
-        deploy_id = response_json['id']
+
         deploy_headers = self.headers.copy()
         deploy_headers.update({'Content-Type': 'application/octet-stream'})
-        if force_all:
-            required_hashes = files_hashes.values()
         for required_hash in required_hashes:
             filepath = folder + hashes_files[required_hash]
             with open(filepath, 'rb') as filehandle:
                 response = requests.put(
-                    self._auth_url('v1', 'deploys',
+                    self._auth_url('deploys',
                                    deploy_id, 'files',
                                    quote_url(hashes_files[required_hash])),
                     data=filehandle,
                     headers=deploy_headers)
                 response.raise_for_status()
         return deploy_id
+
+    def get_deploy(self, deploy_id):
+        """Get deploy info.
+
+        :param deploy_id: ID of the deploy.
+        :returns: Deploy information.
+        :rtype: dict
+        """
+        url = self._auth_url('deploys', deploy_id)
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        response_json = response.json()
+        logger.debug(pprint.pformat(response_json))
+        return response.json()

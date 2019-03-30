@@ -33,7 +33,28 @@ class APIRequestTestBase(unittest.TestCase):
             patcher.stop()
 
 
-class TestAPIRequestsCRD(APIRequestTestBase):
+class TestAPIRequests(APIRequestTestBase):
+    """Tests to assert correct calls to Netlify API"""
+
+    def test_get_site(self):
+        mock_response = mock.Mock()
+        mock_response.json.return_value = self._test_sites[0]
+        self._mock_requests.get.return_value = mock_response
+        site = self._api.get_site('some_site_id')
+        self._mock_requests.get.assert_called_once_with(
+            self._netlify_api_url + 'sites/some_site_id?access_token={}'.format('auth-token'),
+            headers=self._api.headers)
+        self.assertEqual(site, pynetlify.rdict_to_site(self._test_sites[0]))
+
+    def test_get_site_files(self):
+        mock_response = mock.Mock()
+        mock_response.json.return_value = ['file.html', 'other_file.html']
+        self._mock_requests.get.return_value = mock_response
+        files = self._api.get_site_files(pynetlify.Site(id='some_site_id', name=None, url=None))
+        self._mock_requests.get.assert_called_once_with(
+            self._netlify_api_url + 'sites/some_site_id/files?access_token={}'.format('auth-token'),
+            headers=self._api.headers)
+        self.assertEqual(files, ['file.html', 'other_file.html'])
 
     def test_sites(self):
         # Mock
@@ -79,6 +100,16 @@ class TestAPIRequestsCRD(APIRequestTestBase):
             self._netlify_api_url + 'sites/del_id?access_token={}'.format('auth-token'),
             headers=self._api.headers)
         self.assertEqual(rval, True)
+
+    def test_get_deploy(self):
+        mock_response = mock.Mock()
+        mock_response.json.return_value = {'deploy': 'deploy_id'}
+        self._mock_requests.get.return_value = mock_response
+        deploy = self._api.get_deploy('some_deploy_id')
+        self._mock_requests.get.assert_called_once_with(
+            self._netlify_api_url + 'deploys/some_deploy_id?access_token={}'.format('auth-token'),
+            headers=self._api.headers)
+        self.assertEqual(deploy, {'deploy': 'deploy_id'})
 
 
 class TestAPIRequestsDeploy(APIRequestTestBase):
