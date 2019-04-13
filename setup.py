@@ -21,7 +21,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pynetlify',
-    version='0.0.1',
+    version='0.1.0',
     url='',
     description='Client and library to interact with Netlify API.',
     author='Toni Sissala',
