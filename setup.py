@@ -19,11 +19,17 @@
 from setuptools import setup, find_packages
 
 
+with open('README.rst') as fh:
+    long_description = fh.read()
+
+
 setup(
     name='pynetlify',
-    version='0.1.0',
-    url='',
+    version='0.1.1',
+    url='https://github.com/toni-sissala/pynetlify',
     description='Client and library to interact with Netlify API.',
+    long_description=long_description,
+    long_description_content_type='text/rst',
     author='Toni Sissala',
     author_email='toni.sissala@gmail.com',
     packages=find_packages(),

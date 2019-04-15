@@ -114,28 +114,40 @@ class TestAPIRequests(APIRequestTestBase):
 
 class TestAPIRequestsDeploy(APIRequestTestBase):
 
+    @mock.patch.object(pynetlify.os, 'walk')
     @mock.patch.object(pynetlify, 'glob')
-    def test_deploy_folder_to_site_does_not_post_none_files(self, mock_glob):
+    def test_deploy_folder_to_site_does_not_post_none_files(self, mock_glob, mock_walk):
         mock_site = mock.Mock(id='some_id')
         rval = self._api.deploy_folder_to_site('/some/path', mock_site)
-        mock_glob.iglob.assert_called_once_with('/some/path/**', recursive=True)
+        if not running_python2:
+            mock_glob.iglob.assert_called_once_with('/some/path/**', recursive=True)
+        else:
+            mock_walk.assert_called_once_with('/some/path/')
         self._mock_requests.post.assert_not_called()
         self.assertEqual(rval, None)
 
+    @mock.patch.object(pynetlify.os, 'walk')
     @mock.patch.object(pynetlify, 'glob')
-    def test_deploy_folder_to_site_posts_filepath(self, mock_glob):
+    def test_deploy_folder_to_site_posts_filepath(self,
+                                                  mock_glob,
+                                                  mock_walk):
         tempfile = NamedTemporaryFile()
         stripped_name = tempfile.name.replace('/tmp/', '', 1)
-        mock_glob.iglob.return_value = [tempfile.name]
+        if running_python2:
+            mock_walk.return_value = [('/tmp', [], [tempfile.name])]
+        else:
+            mock_glob.iglob.return_value = [tempfile.name]
         self._api.deploy_folder_to_site('/tmp', mock.Mock(id='some_other_id'))
         self.assertEqual(self._mock_requests.post.call_count, 1)
         _, kwargs = self._mock_requests.post.call_args
         self.assertEqual(list(kwargs['json']['files'].keys())[0], stripped_name)
 
     @mock.patch.object(pynetlify, 'hashlib')
+    @mock.patch.object(pynetlify.os, 'walk')
     @mock.patch.object(pynetlify, 'glob')
     def test_deploy_folder_to_site_puts_filecontents(self,
                                                      mock_glob,
+                                                     mock_walk,
                                                      mock_hashlib):
         mock_hash = mock.Mock()
         mock_hash.hexdigest.return_value = 'some_hash'
@@ -148,13 +160,15 @@ class TestAPIRequestsDeploy(APIRequestTestBase):
             'deploys/dep_id/files/{}?access_token={}'\
             .format(tempfile.name.replace('/tmp/', '', 1),
                     'auth-token')
-        mock_glob.iglob.return_value = [tempfile.name]
+        if running_python2:
+            mock_walk.return_value = [('/tmp', [], [tempfile.name])]
+        else:
+            mock_glob.iglob.return_value = [tempfile.name]
         self._mock_requests.post.return_value = mock_response
         rval = self._api.deploy_folder_to_site('/tmp', mock.Mock(id='some_other_id'))
         self.assertEqual(self._mock_requests.put.call_count, 1)
         args, _ = self._mock_requests.put.call_args
         url = args[0]
-        print(url)
         self.assertEqual(url, expected_url)
         self.assertEqual(rval, 'dep_id')
 

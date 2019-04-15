@@ -13,20 +13,30 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+from __future__ import (
+    print_function,
+    absolute_import
+)
 
 import sys
 import os
 import time
 import logging
 import argparse
-import configparser
+
 from pynetlify import pynetlify
 
+if sys.version_info[0] == 2:
+    import ConfigParser as configparser
+else:
+    import configparser
 
-running_python2 = sys.version_info[0] == 2
 
 POLL_DEPLOYS_SLEEP = 2
 POLL_DEPLOYS_COUNT = 5
+
+
+# Define command line actions
 
 
 def deploy_folder(netlify_api, args):
@@ -41,7 +51,9 @@ def deploy_folder(netlify_api, args):
     site_live = False
     print('Polling to see when deploy is live')
     while nof_poll_deploys:
-        if not running_python2:
+        if sys.version_info[0] == 2:
+            print('.', end='')
+        else:
             print('.', end='', flush=True)
         deploy = netlify_api.get_deploy(deploy_id)
         if deploy['state'] == 'ready':
@@ -90,7 +102,15 @@ def delete_all_sites(netlify_api, args):
         netlify_api.delete_site(site)
 
 
-def cli_main():
+# Define command line interface
+
+
+def cli_argparser():
+    """Define command line parsers.
+
+    :returns: defined argumentparser
+    :rtype: :obj:`argparse.ArgumentParser`
+    """
     # DECLARE PARSERS
     # ###############
     argparser = argparse.ArgumentParser(
@@ -99,15 +119,10 @@ def cli_main():
     subparsers.required = True
     argparser.add_argument('--auth-token', type=str,
                            help='Netlify Authentication Token')
+    argparser.add_argument('-c', '--config', type=str, default=None,
+                           help='Configuration file path.')
     argparser.add_argument('--loglevel', default='INFO', choices=[
         'DEBUG', 'INFO', 'WARN', 'ERROR'])
-    available_actions = {'create_site': create_site,
-                         'get_site': get_site,
-                         'get_site_files': get_site_files,
-                         'delete_site': delete_site,
-                         'delete_all_sites': delete_all_sites,
-                         'deploy_folder': deploy_folder,
-                         'list_sites': list_sites}
     # Create site parser
     create_site_parser = subparsers.add_parser('create_site')
     create_site_parser.add_argument('--name', type=str,
@@ -134,23 +149,61 @@ def cli_main():
     subparsers.add_parser('delete_all_sites')
     # END PARSER DECLARATIONS
     # #######################
-    args = argparser.parse_args()
-    logging.basicConfig(level=getattr(logging, args.loglevel))
+    return argparser
+
+
+def cli_configfile(configfile_path=None):
+    """Get configuration file if any.
+
+    :param configfile_path: User submitted configuration file path.
+    :type configfile_path: str
+    :returns: Loaded config parser
+    :rtype: :obj:`configparser.ConfigParser`
+    """
+    config = configparser.ConfigParser()
+    if configfile_path:
+        configfile_path = os.path.abspath(configfile_path)
+        if not os.path.exists(configfile_path):
+            logging.error("Configuration file %s does not exists" % (configfile_path,))
+        config.read(configfile_path)
+        return config
     mod_dir = os.path.dirname(__file__)
     cwd = os.getcwd()
     conf_filename = 'pynetlify.ini'
-    configfile_paths = [
-        os.path.join(cwd, conf_filename),
-        os.path.join(mod_dir, conf_filename)]
-    config = configparser.ConfigParser()
-    for c_filepath in configfile_paths:
-        if os.path.exists(c_filepath):
-            config.read(c_filepath)
-    auth_token = args.auth_token or config.get('netlify', 'auth-token')
+    for fallback_path in [
+            os.path.join(cwd, conf_filename),
+            os.path.join(mod_dir, conf_filename)]:
+        if not os.path.exists(fallback_path):
+            continue
+        config.read(fallback_path)
+    return config
+
+
+def cli_main():
+    """Gather args and configuration. Create APIRequest and call appropriate action.
+
+    :returns: 0 on success, 1 on fail.
+    :rtype: int
+    """
+    available_actions = {'create_site': create_site,
+                         'get_site': get_site,
+                         'get_site_files': get_site_files,
+                         'delete_site': delete_site,
+                         'delete_all_sites': delete_all_sites,
+                         'deploy_folder': deploy_folder,
+                         'list_sites': list_sites}
+    argparser = cli_argparser()
+    args = argparser.parse_args()
+    logging.basicConfig(level=getattr(logging, args.loglevel))
+    config = cli_configfile(args.config)
+    if sys.version_info[0] == 2:
+        auth_token = args.auth_token or config.get('netlify', 'auth-token')
+    else:
+        auth_token = args.auth_token or config.get('netlify', 'auth-token', fallback=None)
     if not auth_token:
-        logging.error('Could not find authentication token. '
-                      'Config file lookup paths: %s',
-                      ', '.join(configfile_paths))
+        logging.error('Could not find authentication token.')
+        argparser.print_help()
+        return 1
     selected_action = available_actions.get(args.action)
     netlify_api = pynetlify.APIRequest(auth_token)
     selected_action(netlify_api, args)

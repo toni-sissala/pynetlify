@@ -6,6 +6,14 @@ Python library and simple command line client to interact with Netlify REST API.
 Requires Netlify account with an active authentication token. Visit https://www.netlify.com/docs/cli/#authentication for more information.
 
 
+Install
+-------
+
+PyNetlify is available to install from PyPI::
+
+   pip install pynetlify
+
+
 Use as a command line client
 ----------------------------
 

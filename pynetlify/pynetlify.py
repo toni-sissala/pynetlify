@@ -47,6 +47,22 @@ def rdict_to_site(rdict):
     return Site(name=rdict['name'], id=rdict['id'], url=rdict['url'])
 
 
+def _iter_folder_filepaths_py3(folder):
+    lookup_path = os.path.join(folder, '**')
+    for filepath in glob.iglob(lookup_path, recursive=True):
+        yield filepath
+
+
+def _iter_folder_filepaths_py2(folder):
+    yield folder
+    for root, dirnames, filenames in os.walk(folder):
+        for filename in filenames + dirnames:
+            yield os.path.join(root, filename)
+
+
+iterate_folder_filepaths = _iter_folder_filepaths_py2 if sys.version_info[0] == 2 else _iter_folder_filepaths_py3
+
+
 class APIRequest:
 
     base_url = 'https://api.netlify.com/api/'
@@ -154,9 +170,8 @@ class APIRequest:
         :rtype: None or int
         """
         folder = folder + os.sep if not folder.endswith(os.sep) else folder
-        lookup_path = os.path.join(folder, '**')
         files_hashes = {}
-        for filepath in glob.iglob(lookup_path, recursive=True):
+        for filepath in iterate_folder_filepaths(folder):
             if not os.path.isfile(filepath):
                 continue
             logger.debug('Preparing hash of %s', filepath)
@@ -167,7 +182,7 @@ class APIRequest:
                 })
         if files_hashes == {}:
             # TODO Should we POST anyway to delete all previously deployed files?
-            logger.warning('Found no files from path %s', (lookup_path))
+            logger.warning('Found no files from path %s', (folder,))
             return None
         logger.debug('Requesting required hashes of files %s',
                      ', '.join(files_hashes.keys()))
