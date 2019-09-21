@@ -2,7 +2,7 @@ PyNetlify Changelog
 ===================
 
 
-0.1.1 (unreleased)
+0.1.1 (2019-09-21)
 ------------------
 
 * Make pynetlify work with Python 2.7.

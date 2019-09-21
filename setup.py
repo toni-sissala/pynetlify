@@ -29,7 +29,7 @@ setup(
     url='https://github.com/toni-sissala/pynetlify',
     description='Client and library to interact with Netlify API.',
     long_description=long_description,
-    long_description_content_type='text/rst',
+    long_description_content_type='text/x-rst',
     author='Toni Sissala',
     author_email='toni.sissala@gmail.com',
     packages=find_packages(),
